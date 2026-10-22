@@ -1,0 +1,157 @@
+# market_fix —— 修复群星读档后市场凭空结算一次的 DLL
+
+配合 [`stellaris_mod_injector`](https://github.com/MyresMkG/Stellaris-Mod-Injector) 使用：把编译好的 `market_fix.dll`
+放进游戏根目录的 `injected_mods\`，注入器会自动把它注入 `stellaris.exe`。
+
+**不修改任何游戏文件**，所有改动只在进程内存里，重启游戏即消失。
+
+---
+
+## 它解决什么问题
+
+《群星》有一个长期存在的 bug：**读档时，市场会对挂着的月度订单空中结算一次**——
+价格按这笔订单变化了，但**贸易额没扣、资源没加**。
+
+具体表现：
+
+- 你在市场挂了「每月买 67 能源」
+- 存档 → 读档
+- 读档后（游戏还暂停着）价格已经涨了，但你的能源没变、贸易额没扣
+
+实测证据（同一局，挂单 67 能源）：
+
+| 字段 | 挂单后存档 | 读档后立刻存档 | 变化 |
+| --- | --- | --- | --- |
+| `monthly_trades` | 67 | 67 | 不变（订单还在） |
+| `resources_bought` 能源 | 100 | **167** | **+67**（正好是挂单量） |
+| `internal_market_fluctuations` 能源 | 2 | **3.34** | +1.34 |
+
+也就是说：**读档把挂单当成"已经买过"计进了累计买入量，据此推高了市场价，但没有执行资源转移。**
+
+反过来同样成立：挂卖单时反复读档，可以让市场价格一路走低而不用真出货。
+
+---
+
+## 根因
+
+读档时会走一遍市场对象的反序列化，**紧接着**游戏会执行一次
+`FUN_1408F50A0`（月度市场更新）。这个函数本来只在月底结算时跑，它做的事是：
+
+1. 遍历 `monthly_trades` 里的每一笔挂单
+2. 把成交额计入 `resources_bought` / `resources_sold`
+3. 更新 `internal_market_fluctuations`
+
+正常情况下这一步之后还有资源转移；但读档路径上**只跑了价格部分**，于是市场空涨。
+
+实测日志（hook 两个函数调用点）：
+
+```
+[25870921] read arm=1                      ← 读档读取市场对象
+[25874718] SUPPRESS monthly-update #1      ← 紧跟的月度更新被拦下
+[25902984] pass monthly-update #1          ← 之后的正常月度更新照常运行
+...
+=== detach: suppressed=1 passed=13 ===
+```
+
+---
+
+## 它怎么修
+
+**思路：读档时给一个标记，把紧跟其后的那一次月度更新吞掉。**
+
+- 读档读取市场对象时（`0x8F196C`）→ 设置 `loadArmed` 标志
+- 下一次 `FUN_1408F50A0` 被调用时（两个调用点 `0x25865E` / `0x260905`）→
+  若标志已设置，**直接跳过这次调用**，并清除标志
+- 正常月底没有读档读取，标志不会设置，所以**月度结算不受影响**
+
+日志证据：一次测试中 `suppressed=1 passed=13`——只吞掉了读档那次，其余 13 次正常月度更新全部放行。
+
+---
+
+## 补丁点（Cygnus v4.5.2，sha256 `400df27c82ddc845...`）
+
+| 名称 | RVA | 说明 |
+| --- | --- | --- |
+| 读市场对象（挂标记） | `0x8F196C` | 调用 `FUN_140308990` 的站点 |
+| 月度更新调用点 A（拦截） | `0x25865E` | `call FUN_1408F50A0` |
+| 月度更新调用点 B（拦截） | `0x260905` | `call FUN_1408F50A0` |
+
+**实现方式：只改写调用点的 `E8 rel32` 四个字节**，函数体一个字节都不动。
+（早期版本试过覆盖函数入口，会破坏参数 home space 导致崩溃，已放弃。）
+
+---
+
+## 安装
+
+1. 确保你已经装了 `stellaris_mod_injector`（通过 `VERSION.dll` 代理注入）
+2. 在游戏根目录建目录 `injected_mods\market_fix\`
+3. 把 `market_fix.dll` 放进去
+4. 启动游戏
+
+目录结构：
+
+```
+Stellaris\
+  injected_mods\
+    achievement_unlocker\    ← 如果你还装了别的
+      achievement_unlocker.dll
+    market_fix\
+      market_fix.dll         ← 本补丁
+```
+
+**注入器只扫描 `injected_mods` 下的子目录**，直接放根目录不会被加载。
+
+---
+
+## 日志
+
+日志写在 `injected_mods\market_fix.log`：
+
+```
+market_fix -- suppress bogus monthly update after save load
+base=0x7FF6BC180000
+[READ_BOUGHT] installed at 0x8F196C
+[MONTH_1] installed at 0x25865E
+[MONTH_2] installed at 0x260905
+install done
+[25870921] read arm=1 container=000002d0cc92eba0
+[25874718] SUPPRESS monthly-update #1 (armed=1) market=000002d0c3a22c00
+[25902984] pass monthly-update #1 market=000002d0c3a22c00
+...
+```
+
+看到 `SUPPRESS` 说明拦截生效；`pass` 是正常月度结算。
+
+---
+
+## 构建
+
+需要 MinGW-w64 的 `g++`：
+
+```
+g++ -std=c++17 -O2 -shared -static -static-libgcc -static-libstdc++ \
+    -o build/market_fix.dll src/market_fix.cpp -lkernel32
+```
+
+---
+
+## 已知限制
+
+- **只针对 Cygnus v4.5.2**。游戏更新后 RVA 会变，需要重新定位（三个调用点都是 `call` 指令，
+  可用特征码重新搜索）。
+- 标志窗口约 3.8 秒（实测）。如果某次读档没有触发月度更新，标志会残留并在下一次
+  正常月度结算时被消费掉——**概率极低，但存在**。需要的话可以加超时保护。
+- 这是**行为拦截**而非根因修复。真正该修的是「读档路径不该跑月度结算」，但那是引擎逻辑，
+  mod 层改不了。
+
+---
+
+## 排查方法
+
+如果怀疑没生效，可以对比两份存档：
+
+1. 挂单后存档 `A.sav`
+2. 读 `A.sav`，进游戏后**什么都不做**立刻存档 `B.sav`
+3. 解开两个 `.sav`（本质是 zip），对比 `gamestate` 里的 `market=` 块
+
+打补丁前 `resources_bought` 会加一次挂单量；打补丁后应该完全一致。
