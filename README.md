@@ -99,7 +99,24 @@ Stellaris\
       market_fix.dll         ← 本补丁
 ```
 
-**注入器只扫描 `injected_mods` 下的子目录**，直接放根目录不会被加载。
+### 注意：不同版本的注入器扫描规则不同
+
+实测存在两种行为完全相反的注入器：
+
+| 版本 | 扫描位置 | 本补丁应放在 |
+| --- | --- | --- |
+| 官方 `Stellaris-Mod-Injector`（仓库 README 描述） | `injected_mods\*.dll` | **根目录**：`injected_mods\market_fix.dll` |
+| 新版 / 修改版（本地实测 `stellaris_mod_loader 1.1`） | `injected_mods\{子目录}\*.dll` | **子目录**：`injected_mods\market_fix\market_fix.dll` |
+
+新版注入器的报错字符串是：
+`create '%s' next to stellaris.exe and put the DLLs to load in its immediate subdirectories`
+
+**怎么判断你是哪种：** 看 `injected_mods\stellaris_mod_injector.log` 里的
+`N candidate(s)` 行。如果 DLL 明明在子目录里却能列进 candidate，就是新版；
+如果只有根目录的 DLL 被列出，就是旧版。
+
+**别两个位置都放**：同名 DLL 会被加载两次，`DllMain` 跑两遍，补丁点会被二次改写
+（第二次改写时特征字节已不匹配，会静默跳过，但日志会变脏）。按日志判断放哪一边即可。
 
 ---
 
