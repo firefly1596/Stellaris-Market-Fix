@@ -155,3 +155,30 @@ g++ -std=c++17 -O2 -shared -static -static-libgcc -static-libstdc++ \
 3. 解开两个 `.sav`（本质是 zip），对比 `gamestate` 里的 `market=` 块
 
 打补丁前 `resources_bought` 会加一次挂单量；打补丁后应该完全一致。
+
+---
+
+## 附：自动存档数量怎么改
+
+群星默认只保留 **5** 个自动存档，超出后覆盖最早的。这个上限由用户设置控制，
+**不在 mod 里**，所以改配置文件即可。
+
+打开：
+
+```
+Documents\Paradox Interactive\Stellaris\settings.txt
+```
+
+在文件末尾加一行（数字自己定）：
+
+```
+max_autosaves=20
+```
+
+**注意：**
+
+- **先关游戏再改**，游戏退出时会回写 `settings.txt`，运行时改会被覆盖
+- 用记事本直接打开改、`Ctrl+S` 保存即可，别另存为带 BOM 的 UTF-8
+- 改完重启游戏生效，已有的多余存档不会被删
+
+这个键当前文件里没有，是**新增一行**，不是改数值。
