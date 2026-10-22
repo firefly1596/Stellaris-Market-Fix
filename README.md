@@ -99,26 +99,43 @@ Stellaris\
       market_fix.dll         ← 本补丁
 ```
 
-### 注意：不同版本的注入器扫描规则不同
+### 注入器版本要求
 
-实测存在两种行为完全相反的注入器：
+本补丁需要 **Stellaris-Mod-Injector v1.2.0 或更新**。
 
-| 版本 | 扫描位置 | 本补丁应放在 |
-| --- | --- | --- |
-| 官方 `Stellaris-Mod-Injector`（仓库 README 描述） | `injected_mods\*.dll` | **根目录**：`injected_mods\market_fix.dll` |
-| 新版 / 修改版（本地实测 `stellaris_mod_loader 1.1`） | `injected_mods\{子目录}\*.dll` | **子目录**：`injected_mods\market_fix\market_fix.dll` |
+从 v1.2.0 起，官方规则是：
 
-新版注入器的报错字符串是：
-`create '%s' next to stellaris.exe and put the DLLs to load in its immediate subdirectories`
+- **代理 DLL**（`dxgi.dll` / `d3d11.dll` / `version.dll` / `winmm.dll` / `d3dcompiler_47.dll`
+  任选一个）放**游戏根目录**
+- **被注入的 DLL** 必须放在 `injected_mods` 的**一层子目录**里，例如 `injected_mods\market_fix\`
+- 根目录的 `injected_mods\*.dll` **不会被扫描**
 
-**怎么判断你是哪种：** 看 `injected_mods\stellaris_mod_injector.log` 里的
-`N candidate(s)` 行。如果 DLL 明明在子目录里却能列进 candidate，就是新版；
-如果只有根目录的 DLL 被列出，就是旧版。
+来源：[v1.2.0 发行说明](https://github.com/MyresMkG/Stellaris-Mod-Injector/releases/tag/v1.2.0)
+（原文：*现版本所有非 Stellaris-Mod-Injector 的 dll 均需放到子目录*）
 
-**别两个位置都放**：同名 DLL 会被加载两次，`DllMain` 跑两遍，补丁点会被二次改写
-（第二次改写时特征字节已不匹配，会静默跳过，但日志会变脏）。按日志判断放哪一边即可。
+### 临时禁用本补丁
 
----
+v1.2.0 提供了单 DLL 开关：在 DLL 同目录创建一个空文件，文件名是 DLL 名加 `noinject`：
+
+```
+injected_mods\market_fix\market_fix.dll
+injected_mods\market_fix\market_fix.dllnoinject    ← 有这个文件就不加载
+```
+
+日志会显示 `[skip] market_fix.dll: disabled by market_fix.dllnoinject`。删除标记后下次启动恢复。
+
+### 怎么确认加载成功
+
+看 `injected_mods\stellaris_mod_injector.log`：
+
+```
+2 candidate(s), 2 to load
+loading [1/2] achievement_unlocker.dll ... ok
+loading [2/2] market_fix.dll ... ok
+2 of 2 DLL(s) loaded into pid 12345
+```
+
+看到 `market_fix.dll ... ok` 就说明进来了。
 
 ## 日志
 
