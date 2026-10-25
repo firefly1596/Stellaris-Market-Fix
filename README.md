@@ -173,7 +173,7 @@ loading [2/2] market_fix.dll ... ok
 读一个**挂着月度订单**的存档，然后打开：
 
 ```
-<游戏根目录>\injected_mods\market_fix.log
+<游戏根目录>\injected_mods\market_probe.log
 ```
 
 应该能看到：
@@ -230,9 +230,9 @@ injected_mods\market_fix\
 | 文件 | 内容 |
 | --- | --- |
 | `stellaris_mod_injector.log` | 注入器自己的日志：加载了哪些 DLL |
-| `market_fix.log` | **本补丁的日志**：拦截记录 |
+| `market_probe.log` | **本补丁的日志**：拦截记录 |
 
-`market_fix.log` 示例：
+`market_probe.log` 示例：
 
 ```
 market_fix -- suppress bogus monthly update after save load
