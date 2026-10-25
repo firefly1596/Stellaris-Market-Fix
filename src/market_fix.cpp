@@ -192,7 +192,7 @@ static void Init() {
     char path[MAX_PATH];
     GetModuleFileNameA(nullptr, path, MAX_PATH);
     char* s = strrchr(path, '\\'); if (s) *s = 0;
-    strncat_s(path, "\\injected_mods\\market_probe.log", _TRUNCATE);
+    strncat_s(path, "\\injected_mods\\market_fix.log", _TRUNCATE);
     g_log = fopen(path, "w");
     if (!g_log) return;
     InitializeCriticalSection(&g_cs);
