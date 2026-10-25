@@ -81,65 +81,158 @@
 
 ---
 
-## 安装
+## 安装步骤
 
-1. 确保你已经装了 `stellaris_mod_injector`（通过 `VERSION.dll` 代理注入）
-2. 在游戏根目录建目录 `injected_mods\market_fix\`
-3. 把 `market_fix.dll` 放进去
-4. 启动游戏
+### 前提
 
-目录结构：
+- 游戏版本 **Cygnus v4.5.2**
+- 已安装 [Stellaris-Mod-Injector v1.2.0](https://github.com/MyresMkG/Stellaris-Mod-Injector/releases/tag/v1.2.0) 或更新
+
+### 1. 找到游戏根目录
+
+Steam 里右键《群星》→ **管理** → **浏览本地文件**，会打开类似这样的目录：
+
+```
+<你安装 Steam 的盘符>\Steam\steamapps\common\Stellaris\
+```
+
+常见例子：
+
+```
+C:\Program Files (x86)\Steam\steamapps\common\Stellaris\
+D:\Steam\steamapps\common\Stellaris\
+E:\Steam\steamapps\common\Stellaris\
+```
+
+这个目录里应该有 `stellaris.exe`。
+
+### 2. 确认代理 DLL 已就位
+
+在游戏根目录里，应该已经有一个代理 DLL（任选其一即可，通常是从注入器 v1.2.0 拿到的）：
+
+```
+stellaris.exe
+version.dll          ← 或 dxgi.dll / d3d11.dll / winmm.dll / d3dcompiler_47.dll
+```
+
+**没有的话**：去 [v1.2.0 发行版](https://github.com/MyresMkG/Stellaris-Mod-Injector/releases/tag/v1.2.0)
+下载一个，解压到游戏根目录（和 `stellaris.exe` 同级）。
+
+### 3. 创建补丁目录
+
+在游戏根目录下进入 `injected_mods`，在里面新建一个文件夹，名为 `market_fix`：
 
 ```
 Stellaris\
-  injected_mods\
-    achievement_unlocker\    ← 如果你还装了别的
-      achievement_unlocker.dll
-    market_fix\
-      market_fix.dll         ← 本补丁
+├── stellaris.exe
+├── version.dll
+└── injected_mods\
+    └── market_fix\          ← 新建这个文件夹
 ```
 
-### 注入器版本要求
+**必须是 `injected_mods` 的直接子目录。​** 注入器只扫描一层，根目录和更深层都不认。
 
-本补丁需要 **Stellaris-Mod-Injector v1.2.0 或更新**。
+### 4. 放入 DLL
 
-从 v1.2.0 起，官方规则是：
-
-- **代理 DLL**（`dxgi.dll` / `d3d11.dll` / `version.dll` / `winmm.dll` / `d3dcompiler_47.dll`
-  任选一个）放**游戏根目录**
-- **被注入的 DLL** 必须放在 `injected_mods` 的**一层子目录**里，例如 `injected_mods\market_fix\`
-- 根目录的 `injected_mods\*.dll` **不会被扫描**
-
-来源：[v1.2.0 发行说明](https://github.com/MyresMkG/Stellaris-Mod-Injector/releases/tag/v1.2.0)
-（原文：*现版本所有非 Stellaris-Mod-Injector 的 dll 均需放到子目录*）
-
-### 临时禁用本补丁
-
-v1.2.0 提供了单 DLL 开关：在 DLL 同目录创建一个空文件，文件名是 DLL 名加 `noinject`：
+把本项目的 `market_fix.dll` 复制进 `market_fix` 文件夹：
 
 ```
-injected_mods\market_fix\market_fix.dll
-injected_mods\market_fix\market_fix.dllnoinject    ← 有这个文件就不加载
+Stellaris\
+├── stellaris.exe
+├── version.dll
+└── injected_mods\
+    ├── achievement_unlocker\          ← 你原有的，保持不动
+    │   └── achievement_unlocker.dll
+    └── market_fix\
+        └── market_fix.dll              ← 新增
 ```
 
-日志会显示 `[skip] market_fix.dll: disabled by market_fix.dllnoinject`。删除标记后下次启动恢复。
+### 5. 启动游戏，检查加载
 
-### 怎么确认加载成功
+正常启动游戏（双击 `stellaris.exe`，或从 Steam 启动都行）。
 
-看 `injected_mods\stellaris_mod_injector.log`：
+打开：
+
+```
+<游戏根目录>\injected_mods\stellaris_mod_injector.log
+```
+
+应该能看到：
 
 ```
 2 candidate(s), 2 to load
 loading [1/2] achievement_unlocker.dll ... ok
 loading [2/2] market_fix.dll ... ok
-2 of 2 DLL(s) loaded into pid 12345
+2 of 2 DLL(s) loaded into pid XXXXX
 ```
 
-看到 `market_fix.dll ... ok` 就说明进来了。
+看到 `market_fix.dll ... ok` 就是加载成功。
+
+### 6. 确认补丁生效
+
+读一个**挂着月度订单**的存档，然后打开：
+
+```
+<游戏根目录>\injected_mods\market_fix.log
+```
+
+应该能看到：
+
+```
+[时间戳] read arm=1 container=0x...
+[时间戳] SUPPRESS monthly-update #1 (armed=1) market=0x...
+```
+
+`SUPPRESS` 出现即表示拦截成功。之后的 `pass monthly-update` 是正常月度结算，不受影响。
+
+### 7. 验证效果（可选）
+
+最直接的方法是对比两份存档：
+
+1. 挂个月度订单，存档 → 记为 `A.sav`
+2. 读 `A.sav`，进游戏后**什么都不做**，立刻存档 → 记为 `B.sav`
+3. 用仓库里的 `tools/verify_fix.py` 对比
+
+```
+python tools/verify_fix.py A.sav B.sav
+```
+
+- 输出 `IDENTICAL` = 修复生效
+- 输出 `DIFFERENT` 并列出差异 = 没生效
+
+---
+
+## 临时禁用
+
+出问题时不用删文件，在 DLL 同目录建一个空文件：
+
+```
+injected_mods\market_fix\market_fix.dllnoinject
+```
+
+重启游戏即跳过加载。日志会显示 `[skip] market_fix.dll: disabled by ...`。
+删掉这个空文件就恢复。
+
+## 卸载
+
+删掉整个文件夹即可：
+
+```
+injected_mods\market_fix\
+```
+
+重启游戏后完全移除。**游戏本体文件没有任何改动。**
 
 ## 日志
 
-日志写在 `injected_mods\market_fix.log`：
+日志有两份，都在 `injected_mods\` 下：
+
+| 文件 | 内容 |
+| --- | --- |
+| `stellaris_mod_injector.log` | 注入器自己的日志：加载了哪些 DLL |
+| `market_fix.log` | **本补丁的日志**：拦截记录 |
+
+`market_fix.log` 示例：
 
 ```
 market_fix -- suppress bogus monthly update after save load
@@ -151,12 +244,20 @@ install done
 [25870921] read arm=1 container=000002d0cc92eba0
 [25874718] SUPPRESS monthly-update #1 (armed=1) market=000002d0c3a22c00
 [25902984] pass monthly-update #1 market=000002d0c3a22c00
-...
+[25910781] pass monthly-update #2 market=000002d0c3a22c00
 ```
 
-看到 `SUPPRESS` 说明拦截生效；`pass` 是正常月度结算。
+- `read arm=N` — 读档读到了市场对象，设置标志
+- `SUPPRESS monthly-update #N` — 紧跟其后的错误结算被拦下
+- `pass monthly-update #N` — 正常月度结算，照常放行
 
----
+关游戏时末尾会有一条汇总：
+
+```
+=== detach: suppressed=1 passed=13 ===
+```
+
+`suppressed` 是拦下的次数（每次读档 1 次），`passed` 是正常放行的次数。
 
 ## 构建
 
